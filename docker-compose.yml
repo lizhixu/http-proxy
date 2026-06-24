@@ -2,11 +2,11 @@ services:
   proxy:
     build: .
     ports:
-      - "7890:7890"
-      - "7891:7891"
+      - "${PORT:-7890}:${PORT:-7890}"
+      - "${HTTP_PORT:-7891}:${HTTP_PORT:-7891}"
     environment:
-      - PORT=7890
-      - HTTP_PORT=7891
-      - PROXY_USER=user
-      - PROXY_PASS=pass
+      - PORT=${PORT:-7890}
+      - HTTP_PORT=${HTTP_PORT:-7891}
+      - PROXY_USER
+      - PROXY_PASS
     restart: unless-stopped
