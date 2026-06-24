@@ -1,0 +1,12 @@
+services:
+  proxy:
+    build: .
+    ports:
+      - "7890:7890"
+      - "7891:7891"
+    environment:
+      - PORT=7890
+      - HTTP_PORT=7891
+      - PROXY_USER=user
+      - PROXY_PASS=pass
+    restart: unless-stopped
