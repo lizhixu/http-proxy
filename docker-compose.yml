@@ -3,10 +3,8 @@ services:
     build: .
     ports:
       - "${PORT:-7890}:${PORT:-7890}"
-      - "${HTTP_PORT:-7891}:${HTTP_PORT:-7891}"
     environment:
       - PORT=${PORT:-7890}
-      - HTTP_PORT=${HTTP_PORT:-7891}
       - PROXY_USER
       - PROXY_PASS
     restart: unless-stopped

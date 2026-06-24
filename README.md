@@ -1,10 +1,10 @@
 # http-proxy
 
-轻量级 SOCKS5 / HTTP 代理，Go 标准库实现，零依赖，支持 Docker 一键部署。可作为 Clash、V2Ray 等工具的代理节点使用。
+轻量级 HTTP 代理，Go 标准库实现，零依赖，支持 Docker 一键部署。可作为 Clash、V2Ray 等工具的代理节点使用。
 
 ## 特性
 
-- SOCKS5 + HTTP 双协议
+- HTTP / HTTPS 隧道代理
 - 用户名/密码认证
 - `sync.Pool` 缓冲复用，低内存占用
 - 多阶段构建，镜像约 2MB
@@ -22,20 +22,9 @@ docker compose up -d
 
 | 变量 | 默认值 | 说明 |
 |------|--------|------|
-| `PORT` | `7890` | SOCKS5 端口 |
-| `HTTP_PORT` | `7891` | HTTP 代理端口 |
+| `PORT` | `7890` | 代理端口 |
 | `PROXY_USER` | *(空)* | 用户名（留空则无认证） |
 | `PROXY_PASS` | *(空)* | 密码（留空则无认证） |
-
-修改 `docker-compose.yml` 中的账号密码后启动：
-
-```yaml
-environment:
-  - PORT=7890
-  - HTTP_PORT=7891
-  - PROXY_USER=myuser
-  - PROXY_PASS=mypassword
-```
 
 ### 本地运行
 
@@ -49,17 +38,10 @@ PROXY_USER=user PROXY_PASS=pass go run main.go
 
 ```yaml
 proxies:
-  - name: my-socks5
-    type: socks5
-    server: your-server-ip
-    port: 7890
-    username: user
-    password: pass
-
-  - name: my-http
+  - name: my-proxy
     type: http
     server: your-server-ip
-    port: 7891
+    port: 7890
     username: user
     password: pass
 ```
