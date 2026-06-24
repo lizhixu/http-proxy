@@ -2,6 +2,7 @@ package main
 
 import (
 	"encoding/base64"
+	"fmt"
 	"io"
 	"log"
 	"net"
@@ -29,7 +30,9 @@ func main() {
 	proxyPass = os.Getenv("PROXY_PASS")
 
 	port := env("PORT", "7890")
-	log.Printf("http proxy on :%s", port)
+
+	printInfo(port)
+
 	log.Fatal(http.ListenAndServe(":"+port, http.HandlerFunc(handle)))
 }
 
@@ -38,6 +41,66 @@ func env(key, fallback string) string {
 		return v
 	}
 	return fallback
+}
+
+func printInfo(port string) {
+	ip := getPublicIP()
+
+	fmt.Println("========================================")
+	fmt.Println("  HTTP Proxy 已启动")
+	fmt.Println("========================================")
+	fmt.Printf("  地址: %s\n", ip)
+	fmt.Printf("  端口: %s\n", port)
+	if proxyUser != "" && proxyPass != "" {
+		fmt.Printf("  用户: %s\n", proxyUser)
+		fmt.Printf("  密码: %s\n", proxyPass)
+	} else {
+		fmt.Println("  认证: 无")
+	}
+	fmt.Println("========================================")
+	fmt.Println("  Clash 配置:")
+	fmt.Println("========================================")
+	fmt.Printf("  - name: my-proxy\n")
+	fmt.Printf("    type: http\n")
+	fmt.Printf("    server: %s\n", ip)
+	fmt.Printf("    port: %s\n", port)
+	if proxyUser != "" && proxyPass != "" {
+		fmt.Printf("    username: %s\n", proxyUser)
+		fmt.Printf("    password: %s\n", proxyPass)
+	}
+	fmt.Println("========================================")
+}
+
+func getPublicIP() string {
+	// 尝试多个服务获取公网 IP
+	services := []string{
+		"https://api.ipify.org",
+		"https://icanhazip.com",
+		"https://ifconfig.me",
+	}
+
+	client := &http.Client{Timeout: 3 * time.Second}
+	for _, svc := range services {
+		resp, err := client.Get(svc)
+		if err != nil {
+			continue
+		}
+		defer resp.Body.Close()
+		body, _ := io.ReadAll(resp.Body)
+		ip := strings.TrimSpace(string(body))
+		if net.ParseIP(ip) != nil {
+			return ip
+		}
+	}
+
+	// 回退：获取本机 IP
+	addrs, _ := net.InterfaceAddrs()
+	for _, addr := range addrs {
+		if ipNet, ok := addr.(*net.IPNet); ok && !ipNet.IP.IsLoopback() && ipNet.IP.To4() != nil {
+			return ipNet.IP.String()
+		}
+	}
+	return "localhost"
 }
 
 func handle(w http.ResponseWriter, r *http.Request) {
