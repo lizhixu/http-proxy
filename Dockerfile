@@ -5,4 +5,6 @@ RUN CGO_ENABLED=0 go build -ldflags="-s -w" -o /proxy .
 
 FROM scratch
 COPY --from=builder /proxy /proxy
+ARG PORT=7890
+EXPOSE ${PORT}
 ENTRYPOINT ["/proxy"]
