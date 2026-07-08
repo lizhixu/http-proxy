@@ -42,7 +42,7 @@ func env(key, fallback string) string {
 
 func handle(w http.ResponseWriter, r *http.Request) {
 	log.Printf("%s %s", r.Method, r.Host)
-	
+
 	if proxyUser != "" && proxyPass != "" {
 		if !checkAuth(r) {
 			log.Printf("Auth failed")
@@ -75,7 +75,7 @@ func checkAuth(r *http.Request) bool {
 
 func handleTunnel(w http.ResponseWriter, r *http.Request) {
 	log.Printf("CONNECT to %s", r.Host)
-	
+
 	target, err := net.DialTimeout("tcp", r.Host, 30*time.Second)
 	if err != nil {
 		log.Printf("Dial error: %v", err)
@@ -92,12 +92,17 @@ func handleTunnel(w http.ResponseWriter, r *http.Request) {
 
 	client, _, err := hijacker.Hijack()
 	if err != nil {
+		log.Printf("Hijack error: %v", err)
 		target.Close()
 		return
 	}
 
+	log.Printf("Sending 200 Connection Established")
 	client.Write([]byte("HTTP/1.1 200 Connection Established\r\n\r\n"))
+
+	log.Printf("Starting relay")
 	relay(client, target)
+	log.Printf("Relay finished")
 }
 
 func handleForward(w http.ResponseWriter, r *http.Request) {
