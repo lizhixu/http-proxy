@@ -2,6 +2,7 @@ package main
 
 import (
 	"encoding/base64"
+	"errors"
 	"io"
 	"log"
 	"net"
@@ -82,10 +83,11 @@ func handleTunnel(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, err.Error(), http.StatusBadGateway)
 		return
 	}
+	defer target.Close()
 
 	hijacker, ok := w.(http.Hijacker)
 	if !ok {
-		target.Close()
+		log.Printf("Hijack not supported")
 		http.Error(w, "hijack failed", http.StatusInternalServerError)
 		return
 	}
@@ -93,21 +95,16 @@ func handleTunnel(w http.ResponseWriter, r *http.Request) {
 	client, _, err := hijacker.Hijack()
 	if err != nil {
 		log.Printf("Hijack error: %v", err)
-		target.Close()
+		http.Error(w, "hijack failed", http.StatusInternalServerError)
 		return
 	}
+	defer client.Close()
 
 	log.Printf("Sending 200 Connection Established")
-	response := []byte("HTTP/1.1 200 Connection Established\r\nProxy-Agent: go-proxy/1.0\r\n\r\n")
-	_, err = client.Write(response)
+	_, err = client.Write([]byte("HTTP/1.1 200 Connection Established\r\n\r\n"))
 	if err != nil {
 		log.Printf("Write response error: %v", err)
-		target.Close()
 		return
-	}
-	// Flush if possible
-	if flusher, ok := client.(interface{ Flush() }); ok {
-		flusher.Flush()
 	}
 
 	log.Printf("Starting relay")
@@ -142,15 +139,42 @@ func relay(left, right net.Conn) {
 
 	cp := func(dst, src net.Conn) {
 		defer wg.Done()
+
 		bufp := bufPool.Get().(*[]byte)
 		n, err := io.CopyBuffer(dst, src, *bufp)
-		log.Printf("Copied %d bytes from %v to %v, err: %v", n, src.RemoteAddr(), dst.RemoteAddr(), err)
 		bufPool.Put(bufp)
-		dst.Close()
+
+		if err != nil && !isNormalClose(err) {
+			log.Printf("Copied %d bytes from %v to %v, err: %v", n, src.RemoteAddr(), dst.RemoteAddr(), err)
+		} else {
+			log.Printf("Copied %d bytes from %v to %v", n, src.RemoteAddr(), dst.RemoteAddr())
+		}
+
+		closeWrite(dst)
 	}
 
 	go cp(left, right)
 	go cp(right, left)
 
 	wg.Wait()
+}
+
+func closeWrite(conn net.Conn) {
+	if tcp, ok := conn.(*net.TCPConn); ok {
+		_ = tcp.CloseWrite()
+		return
+	}
+
+	_ = conn.Close()
+}
+
+func isNormalClose(err error) bool {
+	if err == nil || err == io.EOF || errors.Is(err, net.ErrClosed) {
+		return true
+	}
+
+	msg := err.Error()
+	return strings.Contains(msg, "connection reset by peer") ||
+		strings.Contains(msg, "broken pipe") ||
+		strings.Contains(msg, "use of closed network connection")
 }
