@@ -41,8 +41,11 @@ func env(key, fallback string) string {
 }
 
 func handle(w http.ResponseWriter, r *http.Request) {
+	log.Printf("%s %s", r.Method, r.Host)
+	
 	if proxyUser != "" && proxyPass != "" {
 		if !checkAuth(r) {
+			log.Printf("Auth failed")
 			w.Header().Set("Proxy-Authenticate", `Basic realm="proxy"`)
 			http.Error(w, "proxy auth required", http.StatusProxyAuthRequired)
 			return
@@ -71,8 +74,11 @@ func checkAuth(r *http.Request) bool {
 }
 
 func handleTunnel(w http.ResponseWriter, r *http.Request) {
-	target, err := net.DialTimeout("tcp", r.Host, 10*time.Second)
+	log.Printf("CONNECT to %s", r.Host)
+	
+	target, err := net.DialTimeout("tcp", r.Host, 30*time.Second)
 	if err != nil {
+		log.Printf("Dial error: %v", err)
 		http.Error(w, err.Error(), http.StatusBadGateway)
 		return
 	}
