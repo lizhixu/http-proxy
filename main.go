@@ -23,6 +23,18 @@ var bufPool = sync.Pool{
 var (
 	proxyUser string
 	proxyPass string
+
+	forwardTransport = &http.Transport{
+		Proxy: nil,
+		DialContext: (&net.Dialer{
+			Timeout:   30 * time.Second,
+			KeepAlive: 30 * time.Second,
+		}).DialContext,
+		IdleConnTimeout:       90 * time.Second,
+		TLSHandshakeTimeout:   10 * time.Second,
+		ResponseHeaderTimeout: 30 * time.Second,
+		ExpectContinueTimeout: 1 * time.Second,
+	}
 )
 
 func main() {
@@ -114,23 +126,43 @@ func handleTunnel(w http.ResponseWriter, r *http.Request) {
 
 func handleForward(w http.ResponseWriter, r *http.Request) {
 	r.RequestURI = ""
-	r.Header.Del("Proxy-Connection")
-	r.Header.Del("Proxy-Authorization")
+	removeHopHeaders(r.Header)
 
-	resp, err := http.DefaultTransport.RoundTrip(r)
+	resp, err := forwardTransport.RoundTrip(r)
 	if err != nil {
+		log.Printf("Forward error %s %s: %v", r.Method, r.URL.String(), err)
 		http.Error(w, err.Error(), http.StatusBadGateway)
 		return
 	}
 	defer resp.Body.Close()
 
+	removeHopHeaders(resp.Header)
 	for k, vv := range resp.Header {
 		for _, v := range vv {
 			w.Header().Add(k, v)
 		}
 	}
 	w.WriteHeader(resp.StatusCode)
-	io.Copy(w, resp.Body)
+	if _, err := io.Copy(w, resp.Body); err != nil && !isNormalClose(err) {
+		log.Printf("Response copy error %s %s: %v", r.Method, r.URL.String(), err)
+	}
+}
+
+func removeHopHeaders(h http.Header) {
+	for _, f := range strings.Split(h.Get("Connection"), ",") {
+		if f = strings.TrimSpace(f); f != "" {
+			h.Del(f)
+		}
+	}
+
+	h.Del("Connection")
+	h.Del("Proxy-Connection")
+	h.Del("Proxy-Authorization")
+	h.Del("Keep-Alive")
+	h.Del("TE")
+	h.Del("Trailer")
+	h.Del("Transfer-Encoding")
+	h.Del("Upgrade")
 }
 
 func relay(left, right net.Conn) {
