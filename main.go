@@ -133,7 +133,8 @@ func relay(left, right net.Conn) {
 	cp := func(dst, src net.Conn) {
 		defer wg.Done()
 		bufp := bufPool.Get().(*[]byte)
-		io.CopyBuffer(dst, src, *bufp)
+		n, err := io.CopyBuffer(dst, src, *bufp)
+		log.Printf("Copied %d bytes from %v to %v, err: %v", n, src.RemoteAddr(), dst.RemoteAddr(), err)
 		bufPool.Put(bufp)
 		dst.Close()
 	}
