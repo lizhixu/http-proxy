@@ -87,7 +87,7 @@ func checkAuth(r *http.Request) bool {
 }
 
 func handleTunnel(w http.ResponseWriter, r *http.Request) {
-	log.Printf("CONNECT to %s", r.Host)
+	log.Printf("CONNECT %s -> %s", r.RemoteAddr, r.Host)
 
 	target, err := net.DialTimeout("tcp", r.Host, 30*time.Second)
 	if err != nil {
@@ -112,10 +112,12 @@ func handleTunnel(w http.ResponseWriter, r *http.Request) {
 	}
 	defer client.Close()
 
-	log.Printf("Sending 200 Connection Established")
+	log.Printf("Sending 200 Connection Established to %s", r.RemoteAddr)
 	_, err = client.Write([]byte("HTTP/1.1 200 Connection Established\r\n\r\n"))
 	if err != nil {
-		log.Printf("Write response error: %v", err)
+		if !isNormalClose(err) {
+			log.Printf("Write response error to %s: %v", r.RemoteAddr, err)
+		}
 		return
 	}
 
