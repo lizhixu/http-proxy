@@ -98,7 +98,17 @@ func handleTunnel(w http.ResponseWriter, r *http.Request) {
 	}
 
 	log.Printf("Sending 200 Connection Established")
-	client.Write([]byte("HTTP/1.1 200 Connection Established\r\n\r\n"))
+	response := []byte("HTTP/1.1 200 Connection Established\r\nProxy-Agent: go-proxy/1.0\r\n\r\n")
+	_, err = client.Write(response)
+	if err != nil {
+		log.Printf("Write response error: %v", err)
+		target.Close()
+		return
+	}
+	// Flush if possible
+	if flusher, ok := client.(interface{ Flush() }); ok {
+		flusher.Flush()
+	}
 
 	log.Printf("Starting relay")
 	relay(client, target)
